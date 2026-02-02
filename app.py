@@ -9,9 +9,9 @@ from datetime import datetime
 from flask import (
     Flask,
     abort,
+    jsonify,
     render_template,
     request,
-    Response,
     flash,
     redirect,
     url_for,
@@ -275,20 +275,32 @@ def create_venue_submission():
         abort(400)
     else:
         flash("Venue " + request.form["name"] + " was successfully listed!")
-    # TODO: on unsuccessful db insert, flash an error instead.
-    # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
-    # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
     return render_template("pages/home.html")
 
 
 @app.route("/venues/<venue_id>", methods=["DELETE"])
 def delete_venue(venue_id):
-    # TODO: Complete this endpoint for taking a venue_id, and using
-    # SQLAlchemy ORM to delete a record. Handle cases where the session commit could fail.
-
-    # BONUS CHALLENGE: Implement a button to delete a Venue on a Venue Page, have it so that
-    # clicking that button delete it from the db then redirect the user to the homepage
-    return None
+    error = False
+    try:
+        venue = Venue.query.get(venue_id)
+        db.session.delete(venue)
+        db.session.commit()
+    except Exception as e:
+        error = True
+        db.session.rollback()
+        print(f"Error occurred: {e}")
+    finally:
+        db.session.close()
+    if error:
+        flash(
+            "An error occurred. Venue "
+            + request.form["name"]
+            + " could not be deleted."
+        )
+        abort(400)
+    else:
+        flash("Venue " + venue_id + " was successfully deleted!")
+    return jsonify({"success": True})
 
 
 #  Artists
@@ -323,9 +335,7 @@ def search_artists():
 
 @app.route("/artists/<int:artist_id>")
 def show_artist(artist_id):
-    print("ARTIST ID:", artist_id)
     artist_display = Artist.query.get(artist_id)
-    print("ARTIST DISPLAY:", artist_display.genres)
     upcoming_shows = (
         db.session.query(
             Venue.id.label("venue_id"),
