@@ -31,6 +31,7 @@ from models import db, Venue, Artist, shows_list
 app = Flask(__name__)
 moment = Moment(app)
 app.config.from_object("config")
+db.init_app(app)
 migrate = Migrate(app, db)
 
 # ----------------------------------------------------------------------------#
@@ -519,6 +520,48 @@ def shows():
             }
         )
     return render_template("pages/shows.html", shows=data)
+
+
+@app.route("/shows/search", methods=["POST"])
+def search_shows():
+    search_term = request.form.get("search_term", "")
+    shows = (
+        db.session.query(
+            Venue.id.label("venue_id"),
+            Venue.name.label("venue_name"),
+            Artist.id.label("artist_id"),
+            Artist.name.label("artist_name"),
+            Artist.image_link.label("artist_image_link"),
+            shows_list.c.start_time,
+        )
+        .join(shows_list, Venue.id == shows_list.c.venue_id)
+        .join(Artist, Artist.id == shows_list.c.artist_id)
+        .filter(
+            Venue.name.ilike(f"%{search_term}%") | Artist.name.ilike(f"%{search_term}%")
+        )
+        .all()
+    )
+    data = []
+    for show in shows:
+        data.append(
+            {
+                "venue_id": show.venue_id,
+                "venue_name": show.venue_name,
+                "artist_id": show.artist_id,
+                "artist_name": show.artist_name,
+                "artist_image_link": show.artist_image_link,
+                "start_time": show.start_time.isoformat(),
+            }
+        )
+    response = {
+        "count": len(shows),
+        "data": data,
+    }
+    return render_template(
+        "pages/search_shows.html",
+        results=response,
+        search_term=request.form.get("search_term", ""),
+    )
 
 
 @app.route("/shows/create")
